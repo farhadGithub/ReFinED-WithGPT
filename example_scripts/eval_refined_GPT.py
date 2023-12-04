@@ -6,8 +6,43 @@ import json
 import csv
 from openai import OpenAI
 
+def compute_metrics(num_exact_matches: list, num_predicted_entities: list,
+                    num_gold_entities: list, domains: list,
+                    target_domain: str = 'all') -> dict:
+    metrics = dict()
+    total_questions = 0
+    total_exact_matches = 0
+    total_gold_entities = 0
+    total_predicted_entities = 0
+    recall = []
+    precision = []
+    for e, p, g, d in zip(num_exact_matches, num_predicted_entities, num_gold_entities, domains):
+        if d == target_domain or target_domain == 'all':
+            total_questions += 1
+            total_exact_matches += e
+            total_predicted_entities += p
+            total_gold_entities += g
+            recall.append(float(e)/g)
+            if p == 0:
+                precision.append(0)
+            else:
+                precision.append(float(e)/p)
+    f1 = [2 * (p * r) / (p + r) if (p + r) > 0 else 0 for p, r in zip(precision, recall)]
+    metrics['total_questions'] = total_questions
+    metrics['total_exact_matches'] = total_exact_matches
+    metrics['total_gold_entities'] = total_gold_entities
+    metrics['total_predicted_entities'] = total_predicted_entities
+    metrics['macro_average_recall'] = sum(recall) / total_questions
+    metrics['macro_average_precision'] = sum(precision) / total_questions
+    metrics['macro_average_f1'] = sum(f1) / total_questions
+    metrics['micro_average_recall'] = total_exact_matches / total_gold_entities
+    metrics['micro_average_precision'] = total_exact_matches / total_predicted_entities
+    metrics['micro_average_f1'] = ((2*metrics['micro_average_recall']*metrics['micro_average_precision'])/
+                                   (metrics['micro_average_recall'] + metrics['micro_average_precision']))
+    return metrics
 
-def create_messages(prompt_type: str, target_domain: str, question: str) -> list:
+
+def create_messages(prompt_type: str, domain: str, question: str) -> list:
     messages = []
     if prompt_type == 'gpt_domain_passed_examples_from_domain':
         messages = [
@@ -28,7 +63,7 @@ def create_messages(prompt_type: str, target_domain: str, question: str) -> list
             1. Coupling is a British television series (2000–2004)"""},
             {"role": "user",
              "content": f"List the entities and their descriptions in this question:\n "
-                        f"Question from {target_domain} domain: {question}\n Answer:"}
+                        f"Question from {domain} domain: {question}\n Answer:"}
         ]
     elif prompt_type == 'gpt_domain_not_passed_examples_from_domain':
         messages = [
@@ -115,7 +150,7 @@ def create_messages(prompt_type: str, target_domain: str, question: str) -> list
             1. Russell Crowe is New Zealand-born actor (born 1964)"""},
             {"role": "user",
              "content": f"List the entities and their descriptions in this question:\n "
-                        f"Question from {target_domain} domain: {question}\n Answer:"}
+                        f"Question from {domain} domain: {question}\n Answer:"}
         ]
     return messages
 
@@ -123,8 +158,8 @@ def create_messages(prompt_type: str, target_domain: str, question: str) -> list
 model_name = 'wikipedia_model'
 entity_set = 'wikidata'
 dataset = 'compmix_dev_set'
-target_domain = 'all'
-prompt_type = 'gpt_domain_passed_examples_generic'
+target_domains = ['all', 'tvseries']
+prompt_type = 'gpt_domain_not_passed_examples_generic'
 seed = 12345
 temperature = 0.0
 save = False
@@ -137,24 +172,28 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 input_file = f'{os.environ.get("DATASET_FOLDER")}{dataset}.json'
 data = json.load(open(input_file))
 
-output_file = f'{os.environ.get("OUTPUT_FOLDER")}{model_name}_{entity_set}_{dataset}_{target_domain}_{prompt_type}.csv'
+output_file = f'{os.environ.get("OUTPUT_FOLDER")}{model_name}_{entity_set}_{dataset}_{prompt_type}.csv'
 
-total_exact_matches = 0.0
-total_entity_count = 0.0
-num_questions = 0
-recall = []
-precision = []
+domains = []
+num_exact_matches = []
+num_predicted_entities = []
+num_gold_entities = []
 output = []
+num_no_span = 0
+num_no_entity_in_span = 0
+num_questions = 0
 
-for item in tqdm(data):
+#for item in tqdm(data):
+for item in data:
+    num_questions += 1
     question = item['question']
+    print(f'{num_questions}: {question}')
     domain = item['domain']
-    if not (target_domain == 'all' or domain == target_domain):
-        continue
+    domains.append(domain)
     gold_entities = item['entities']
     gold_entity_ids = [entity['id'] for entity in gold_entities]
     gold_entity_labels = [entity['label'] for entity in gold_entities]
-    total_entity_count += len(gold_entity_ids)
+    num_gold_entities.append(len(gold_entity_ids))
     question_id = item['question_id']
     convmix_question_id = item['convmix_question_id']
     original_spans = refined.process_text(question)
@@ -162,7 +201,7 @@ for item in tqdm(data):
         model="gpt-3.5-turbo",
         seed=seed,
         temperature=temperature,
-        messages=create_messages(prompt_type, target_domain, question)
+        messages=create_messages(prompt_type, domain, question)
     )
 
     gpt_response = response.choices[0].message.content
@@ -172,7 +211,8 @@ for item in tqdm(data):
     if len(original_spans) > 0:
         gpt_descriptions = gpt_descriptions[:len(original_spans)]
     gpt_entities = 0
-    num_matches = 0
+    num_exact_matches.append(0)
+    num_predicted_entities.append(0)
     for gpt_description in gpt_descriptions:
         gpt_spans = refined.process_text(gpt_description)
         for gpt_span in gpt_spans:
@@ -187,39 +227,50 @@ for item in tqdm(data):
                 else:
                     predicted_entity_score = None
                 if predicted_entity_id in gold_entity_ids:
-                    num_matches += 1
-                    row = [question_id, convmix_question_id, question,
+                    num_exact_matches[-1] += 1
+                    row = [question_id, convmix_question_id, domain, question,
                            predicted_entity_id, predicted_entity_label,
                            predicted_entity_id, predicted_entity_label, predicted_entity_score]
                     output.append(row)
                 if predicted_entity_id is not None:  # only consider one entity per
-                    gpt_entities += 1
+                    num_predicted_entities[-1] += 1
                     break
-    if num_matches == 0:
+
+    if num_exact_matches[-1] == 0:
         for i in range(len(gold_entity_labels)):
-            row = [question_id, convmix_question_id, question,
+            row = [question_id, convmix_question_id, domain, question,
                    gold_entity_ids[i], gold_entity_labels[i], None, None, None]
             output.append(row)
-    total_exact_matches += num_matches
-    recall.append(float(num_matches)/len(gold_entity_ids))
-    if gpt_entities > 0:
-        precision.append(float(num_matches)/gpt_entities)
-    else:
-        precision.append(0.0)
 
 if save:
     with open(output_file, 'w') as f:
         csvwriter = csv.writer(f, delimiter=',')
-        csvwriter.writerow(['question_id', 'convmix_question_id', 'question',
+        csvwriter.writerow(['question_id', 'convmix_question_id', 'domain', 'question',
                             'gold_entity_id', 'gold_entity_label',
                             'predicted_entity_id', 'predicted_entity_label', 'predicted_entity_score'])
         for row in output:
             csvwriter.writerow(row)
 
-f1 = [2*(p*r)/(p+r) if (p+r) > 0 else 0 for p, r in zip(precision, recall)]
-macro_average_f1 = sum(f1)/len(f1)
-print(f'Number of questions: {num_questions}')
-print(f'For model {model_name} and entity set {entity_set} and dataset {dataset} and {target_domain} and {prompt_type},'
-      f'exact match is {total_exact_matches} and'
-      f' number of total entity is {total_entity_count} and EM ratio is {total_exact_matches/total_entity_count:.2f}')
-print(f'Macro average F1 score is {macro_average_f1:0.2f}')
+print(f'Number of questions with no span: {num_no_span}')
+print(f'Number of spans with no entity: {num_no_entity_in_span}')
+
+for target_domain in target_domains:
+    metrics = compute_metrics(num_exact_matches=num_exact_matches,
+                              num_predicted_entities=num_predicted_entities,
+                              num_gold_entities=num_gold_entities,
+                              domains=domains,
+                              target_domain=target_domain)
+    print(f'==={target_domain}===')
+    print(f'For model {model_name} with entity set {entity_set} and dataset {dataset} and {target_domain} domain(s) '
+          f'and {prompt_type}:')
+    print(f'Number of questions: {metrics["total_questions"]}')
+    print(f'Number of exact matches is {metrics["total_exact_matches"]}')
+    print(f'Number of gold entities is {metrics["total_gold_entities"]}')
+    print(f'Number of predicted entities is {metrics["total_predicted_entities"]}')
+    print(f'EM/micro average recall is {metrics["micro_average_recall"]:0.2f}')
+    print(f'Micro average precision is {metrics["micro_average_precision"]:0.2f}')
+    print(f'Micro average F1 is {metrics["micro_average_f1"]:0.2f}')
+    print(f'Macro average recall is {metrics["macro_average_recall"]:0.2f}')
+    print(f'Macro average precision is {metrics["macro_average_precision"]:0.2f}')
+    print(f'Macro average F1 is {metrics["macro_average_f1"]:0.2f}')
+    print(f'')
