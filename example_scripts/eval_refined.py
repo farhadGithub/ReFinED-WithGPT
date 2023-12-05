@@ -42,15 +42,16 @@ def compute_metrics(num_exact_matches: list, num_predicted_entities: list,
     return metrics
 
 
-model_name = 'wikipedia_model_with_numbers'
+model_name = 'wikipedia_model'
 entity_set = 'wikidata'
-dataset_type = 'wikiwebquestions'
-dataset_name = 'wikiwebquestions_dev_set_processed'
-#dataset_type = 'compmix'
-#dataset_name = 'compmix_dev_set'
-target_domains = ['all']
+#dataset_type = 'wikiwebquestions'
+#dataset_name = 'wikiwebquestions_dev_set_processed'
+dataset_type = 'compmix'
+dataset_name = 'compmix_dev_set'
+#target_domains = ['all']
+target_domains = ['all', 'tvseries']
 other_flavors = 'domain_added_to_questions'
-save = False
+save = True
 
 refined = Refined.from_pretrained(model_name=model_name, entity_set=entity_set)
 
@@ -91,32 +92,49 @@ for item in tqdm(data):
         spans = refined.process_text(domain + ': ' + question)
     else:
         spans = refined.process_text(question)
+
     if len(spans) == 0:
         num_no_span += 1
 
     num_exact_matches.append(0)
-    predicted_entities = []
+    num_predicted_entities.append(0)
+    predicted_entity_ids = set()
     for span in spans:
         predicted_entity = span.predicted_entity
         if predicted_entity is not None:
             predicted_entity_id = predicted_entity.wikidata_entity_id
             predicted_entity_label = predicted_entity.wikipedia_entity_title
-            if predicted_entity_id is not None:
+            if (predicted_entity_id in predicted_entity_ids) or (predicted_entity_id is None):
+                continue
+            num_predicted_entities[-1] += 1
+            predicted_entity_ids.add(predicted_entity_id)
+            if len(span.candidate_entities) > 0:
                 predicted_entity_score = span.candidate_entities[0][1]
-                predicted_entities.append(predicted_entity_id)
-                if predicted_entity_id in gold_entity_ids:
-                    num_exact_matches[-1] += 1
-                    row = [question_id, domain, question,
-                           predicted_entity_id, predicted_entity_label,
-                           predicted_entity_id, predicted_entity_label, predicted_entity_score]
+            else:
+                predicted_entity_score = None
+            if predicted_entity_id in gold_entity_ids:
+                num_exact_matches[-1] += 1
+                row = [question_id, domain, question,
+                       predicted_entity_id, predicted_entity_label,
+                       predicted_entity_id, predicted_entity_label, predicted_entity_score]
+                output.append(row)
+            else:
+                row = [question_id, domain, question,
+                       None, None,
+                       predicted_entity_id, predicted_entity_label, predicted_entity_score]
+                output.append(row)
         else:
             num_no_entity_in_span += 1
-    if num_exact_matches[-1] == 0:
-        for i in range(len(gold_entity_ids)):
-            row = [question_id,  domain, question,
-                   gold_entity_ids[i], gold_entity_labels[i], None, None, None]
+
+    # print those gold entities that were not detected
+    for i, gold_entity_id in enumerate(gold_entity_ids):
+        if gold_entity_id not in predicted_entity_ids:
+            row = [question_id, domain, question,
+                    gold_entity_ids[i], gold_entity_labels[i], None, None, None]
+            output.append(row)
+
     num_gold_entities.append(len(gold_entity_ids))
-    num_predicted_entities.append(len(predicted_entities))
+    num_predicted_entities.append(len(predicted_entity_ids))
 
 if save:
     with open(output_file, 'w') as f:

@@ -5,7 +5,7 @@ import json
 import re
 
 
-dataset = 'wikiwebquestions_dev_set'
+dataset = 'wikiwebquestions_train_set'
 load_dotenv()
 input_file = f'{os.environ.get("DATASET_FOLDER")}{dataset}.json'
 data = json.load(open(input_file))
@@ -20,6 +20,7 @@ for item in data:
     dictionary = {
         "question_id": item['id'],
         "question": item['utterance'],
+        "sparql": sparql,
         "entities": entities
     }
     dictionaries.append(dictionary)
