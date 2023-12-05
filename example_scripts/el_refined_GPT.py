@@ -5,7 +5,7 @@ import os
 import json
 import csv
 from openai import OpenAI
-
+from openai import AzureOpenAI
 
 def create_messages(prompt_type: str, target_domain: str, question: str) -> list:
     messages = []
@@ -132,7 +132,19 @@ save = False
 refined = Refined.from_pretrained(model_name=model_name, entity_set=entity_set)
 
 load_dotenv()
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+api_key = os.getenv("AZURE_OPENAI_API_KEY")
+if api_key is None:
+    raise ValueError("API key not found. Please set the OPENAI_API_KEY environment variable.")
+
+# Uncomment if using OpenAI API Key
+# client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+# Uncomment if using Azure OpenAI
+client = AzureOpenAI(
+    api_key=api_key,
+    api_version="2023-05-15",
+    azure_endpoint="https://ovalopenairesource.openai.azure.com/"
+)
 
 input_file = f'{os.environ.get("DATASET_FOLDER")}{dataset}.json'
 data = json.load(open(input_file))
@@ -158,8 +170,18 @@ for item in tqdm(data):
     question_id = item['question_id']
     convmix_question_id = item['convmix_question_id']
     original_spans = refined.process_text(question)
+
+    # Uncomment if using OpenAI API Key
+    # response = client.chat.completions.create(
+    #     model="gpt-3.5-turbo",
+    #     seed=seed,
+    #     temperature=temperature,
+    #     messages=create_messages(prompt_type, target_domain, question)
+    # )
+
+    # Uncomment if using Azure OpenAI
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-35-turbo",
         seed=seed,
         temperature=temperature,
         messages=create_messages(prompt_type, target_domain, question)
