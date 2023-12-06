@@ -124,7 +124,7 @@ def create_messages(prompt_type: str, domain: str, question: str) -> list:
     elif prompt_type == 'gpt_domain_not_passed_generic_examples_from_WWQ_compmix':
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": f"""You are a named entity recognition system/entity disambiguation system. 
+            {"role": "user", "content": f"""You are a named entity recognition and entity disambiguation system. 
                                             You are given a question and you need to list all entities in the question 
                                             with a brief description for each entity. Each description should be max 10 
                                             words. Here are some examples:
@@ -242,19 +242,19 @@ def create_messages(prompt_type: str, domain: str, question: str) -> list:
 
 model_name = 'wikipedia_model'
 entity_set = 'wikidata'
-#dataset_type = 'compmix'
-#dataset_name = 'compmix_dev_set'
-dataset_type = 'wikiwebquestions'
-dataset_name = 'wikiwebquestions_train_set_processed'
+dataset_type = 'compmix'
+dataset_name = 'compmix_dev_set'
+#dataset_type = 'wikiwebquestions'
+#dataset_name = 'wikiwebquestions_train_set_processed'
 target_domains = ['all']
 #target_domains = ['all', 'tvseries']
 prompt_type = 'gpt_domain_not_passed_generic_examples_from_WWQ_compmix'
 #prompt_type = 'gpt_domain_not_passed_generic_examples_from_compmix'
-margin = 0  # additional number of entities compared to Refined original number that GPT can generate
+margin = 1  # additional number of entities compared to Refined original number that GPT can generate
 instruction_for_query_generation = (f"Given a Wikidata query with resolved entities, "
                                     f"generate the corresponding SPARQL. "
                                     f"Use property names instead of PIDs.")
-save = True
+save = False
 azure = True
 seed = 12345
 temperature = 0.0
@@ -296,9 +296,9 @@ if save:
         csvwriter.writerow(['question_id', 'domain', 'question',
                             'gold_entity_id', 'gold_entity_label',
                             'predicted_entity_id', 'predicted_entity_label', 'predicted_entity_score'])
-
-    with open(llama_training_file, "a") as f:
-        f.write(json.dumps({}, indent=3))
+    if dataset_type == 'wikiwebquestions':
+        with open(llama_training_file, "w") as f:
+            f.write(json.dumps({}, indent=3))
 
 domains = []
 num_exact_matches = []
@@ -394,13 +394,14 @@ for item in data:
 
     # generate output for training the LLM (Llama) for SPARQL query generation
     # works only with wikiwebquestions
-    training_dic = {}
-    entity_list = ';'.join([f'{label} with QID {qid}' for label,qid
-                            in zip(predicted_entity_labels, predicted_entity_ids)])
-    training_dic["input"] = f'Query: {question}\nEntities:{entity_list}'
-    training_dic["sparql"] = sparql_query
-    training_dic["id"] = question_id
-    output_training_dics.append(training_dic)
+    if dataset_type == 'wikiwebquestions':
+        training_dic = {}
+        entity_list = ';'.join([f'{label} with QID {qid}' for label,qid
+                                in zip(predicted_entity_labels, predicted_entity_ids)])
+        training_dic["input"] = f'Query: {question}\nEntities:{entity_list}'
+        training_dic["sparql"] = sparql_query
+        training_dic["id"] = question_id
+        output_training_dics.append(training_dic)
 
     if save and num_questions % 100 == 0:
         with open(result_file, 'a') as f:
@@ -408,17 +409,19 @@ for item in data:
             for row in output_result:
                 csvwriter.writerow(row)
             output_result =[]
-        with open(llama_training_file, "a") as f:
-            f.write(json.dumps(output_training_dics, indent=3))
-            output_training_dics = []
+        if dataset_type == 'wikiwebquestions':
+            with open(llama_training_file, "a") as f:
+                f.write(json.dumps(output_training_dics, indent=3))
+                output_training_dics = []
 
 if save:
     with open(result_file, 'a') as f:
         csvwriter = csv.writer(f, delimiter=',')
         for row in output_result:
             csvwriter.writerow(row)
-    with open(llama_training_file, "a") as f:
-        f.write(json.dumps(output_training_dics, indent=3))
+    if dataset_type == 'wikiwebquestions':
+        with open(llama_training_file, "a") as f:
+            f.write(json.dumps(output_training_dics, indent=3))
 
 print(f'Number of questions with no span: {num_no_span}')
 print(f'Number of spans with no entity: {num_no_entity_in_span}')

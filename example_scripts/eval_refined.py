@@ -44,14 +44,17 @@ def compute_metrics(num_exact_matches: list, num_predicted_entities: list,
 
 model_name = 'wikipedia_model'
 entity_set = 'wikidata'
-#dataset_type = 'wikiwebquestions'
-#dataset_name = 'wikiwebquestions_dev_set_processed'
-dataset_type = 'compmix'
-dataset_name = 'compmix_dev_set'
-#target_domains = ['all']
-target_domains = ['all', 'tvseries']
-other_flavors = 'domain_added_to_questions'
+dataset_type = 'wikiwebquestions'
+dataset_name = 'wikiwebquestions_train_set_processed'
+#dataset_type = 'compmix'
+#dataset_name = 'compmix_dev_set'
+target_domains = ['all']
+#target_domains = ['all', 'tvseries']
+other_flavors = 'no_domain_added_to_questions'
 save = True
+
+print(f'Evaluating model {model_name} with entity set {entity_set} and dataset '
+      f'{dataset_name} and {"and".join(target_domains)} domain(s) and with {other_flavors}:')
 
 refined = Refined.from_pretrained(model_name=model_name, entity_set=entity_set)
 
