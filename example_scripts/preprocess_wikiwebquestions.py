@@ -13,7 +13,7 @@ output_file = f'{os.environ.get("DATASET_FOLDER")}{dataset}_processed.json'
 
 num_questions = 0
 dictionaries = []
-for item in data:
+for item in tqdm(data):
     num_questions += 1
     sparql = item['sparql']
     entities = re.findall(r'Q\d+', sparql)

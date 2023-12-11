@@ -242,19 +242,16 @@ def create_messages(prompt_type: str, domain: str, question: str) -> list:
 
 model_name = 'wikipedia_model'
 entity_set = 'wikidata'
-dataset_type = 'compmix'
-dataset_name = 'compmix_dev_set'
-#dataset_type = 'wikiwebquestions'
-#dataset_name = 'wikiwebquestions_train_set_processed'
+#dataset_type = 'compmix'
+#dataset_name = 'compmix_dev_set'
+dataset_type = 'wikiwebquestions'
+dataset_name = 'wikiwebquestions_train_set_processed'
 target_domains = ['all']
 #target_domains = ['all', 'tvseries']
 prompt_type = 'gpt_domain_not_passed_generic_examples_from_WWQ_compmix'
 #prompt_type = 'gpt_domain_not_passed_generic_examples_from_compmix'
-margin = 1  # additional number of entities compared to Refined original number that GPT can generate
-instruction_for_query_generation = (f"Given a Wikidata query with resolved entities, "
-                                    f"generate the corresponding SPARQL. "
-                                    f"Use property names instead of PIDs.")
-save = False
+margin = 2  # additional number of entities compared to Refined original number that GPT can generate
+save = True
 azure = True
 seed = 12345
 temperature = 0.0
@@ -280,41 +277,29 @@ else: #openai
         raise ValueError("API key not found. Please set the OPENAI_API_KEY environment variable.")
     client = OpenAI(api_key)
 
-
 input_file = f'{os.environ.get("DATASET_FOLDER")}{dataset_name}.json'
 data = json.load(open(input_file))
 
 result_file = \
     f'{os.environ.get("OUTPUT_FOLDER")}result_{model_name}_{entity_set}_{dataset_name}_{prompt_type}_margin_{margin}.csv'
 
-llama_training_file = \
-    f'{os.environ.get("OUTPUT_FOLDER")}llama_training_{model_name}_{entity_set}_{dataset_name}_{prompt_type}_margin_{margin}.csv'
-
-if save:
-    with open(result_file, 'w') as f:
-        csvwriter = csv.writer(f, delimiter=',')
-        csvwriter.writerow(['question_id', 'domain', 'question',
-                            'gold_entity_id', 'gold_entity_label',
-                            'predicted_entity_id', 'predicted_entity_label', 'predicted_entity_score'])
-    if dataset_type == 'wikiwebquestions':
-        with open(llama_training_file, "w") as f:
-            f.write(json.dumps({}, indent=3))
+llm_file = \
+    f'{os.environ.get("OUTPUT_FOLDER")}llm_training_{model_name}_{entity_set}_{dataset_name}_{prompt_type}_margin_{margin}.json'
 
 domains = []
 num_exact_matches = []
 num_predicted_entities = []
 num_gold_entities = []
 output_result = []
-output_training_dics = []
+output_dics = []
 num_no_span = 0
 num_no_entity_in_span = 0
 num_questions = 0
 
-#for item in tqdm(data):
-for item in data:
+for item in tqdm(data):
     num_questions += 1
     question = item['question']
-    print(f'{num_questions}: {question}')
+    #print(f'{num_questions}: {question}')
     if dataset_type == 'compmix':
         domain = item['domain']
         gold_entities = item['entities']
@@ -395,33 +380,27 @@ for item in data:
     # generate output for training the LLM (Llama) for SPARQL query generation
     # works only with wikiwebquestions
     if dataset_type == 'wikiwebquestions':
-        training_dic = {}
+        outup_dic = {}
         entity_list = ';'.join([f'{label} with QID {qid}' for label,qid
                                 in zip(predicted_entity_labels, predicted_entity_ids)])
-        training_dic["input"] = f'Query: {question}\nEntities:{entity_list}'
-        training_dic["sparql"] = sparql_query
-        training_dic["id"] = question_id
-        output_training_dics.append(training_dic)
-
-    if save and num_questions % 100 == 0:
-        with open(result_file, 'a') as f:
-            csvwriter = csv.writer(f, delimiter=',')
-            for row in output_result:
-                csvwriter.writerow(row)
-            output_result =[]
-        if dataset_type == 'wikiwebquestions':
-            with open(llama_training_file, "a") as f:
-                f.write(json.dumps(output_training_dics, indent=3))
-                output_training_dics = []
+        outup_dic["input"] = f'Query: {question}\nEntities:{entity_list}'
+        outup_dic["sparql"] = sparql_query
+        outup_dic["id"] = question_id
+        output_dics.append(outup_dic)
 
 if save:
-    with open(result_file, 'a') as f:
-        csvwriter = csv.writer(f, delimiter=',')
-        for row in output_result:
-            csvwriter.writerow(row)
-    if dataset_type == 'wikiwebquestions':
-        with open(llama_training_file, "a") as f:
-            f.write(json.dumps(output_training_dics, indent=3))
+    if save:
+        with open(result_file, 'w') as f:
+            csvwriter = csv.writer(f, delimiter=',')
+            csvwriter.writerow(['question_id', 'domain', 'question',
+                                'gold_entity_id', 'gold_entity_label',
+                                'predicted_entity_id', 'predicted_entity_label', 'predicted_entity_score'])
+            for row in output_result:
+                csvwriter.writerow(row)
+
+        if dataset_type == 'wikiwebquestions':
+            with open(llm_file, "w") as f:
+                f.write(json.dumps(output_dics, indent=3))
 
 print(f'Number of questions with no span: {num_no_span}')
 print(f'Number of spans with no entity: {num_no_entity_in_span}')
@@ -433,8 +412,9 @@ for target_domain in target_domains:
                               domains=domains,
                               target_domain=target_domain)
     print(f'==={target_domain}===')
-    print(f'For model {model_name} with entity set {entity_set} and dataset {dataset_name} and {target_domain} domain(s) '
-          f'and {prompt_type} and margin {margin}:')
+    print(f'Results for model {model_name} with entity set {entity_set} and dataset '
+          f'{dataset_name} and with the prompt {prompt_type} and '
+          f'{margin} additional predicted entities relative to what Refined generates:')
     print(f'Number of questions: {metrics["total_questions"]}')
     print(f'Number of exact matches is {metrics["total_exact_matches"]}')
     print(f'Number of gold entities is {metrics["total_gold_entities"]}')
