@@ -8,6 +8,16 @@ import argparse
 from openai import OpenAI
 from openai import AzureOpenAI
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 def compute_metrics(num_exact_matches: list, num_predicted_entities: list,
                     num_gold_entities: list, domains: list,
@@ -182,7 +192,80 @@ def create_messages(prompt_type: str, domain: str, question: str) -> list:
             
             Question: who is the prime minister of ethiopia?
             
-            1. Ethiopia is country in the Horn of Africa"""},
+            1. Ethiopia is country in the Horn of Africa
+
+            Question: which wife did king henry behead?
+            
+            1. Henry VIII of England is King of England from 1509 until 1547
+            2. decapitation is complete separation of the head from the body
+            
+            Question: what kind of money should i take to jamaica?
+            
+            1. Jamaica is country in the Caribbean Sea
+            
+            Question: who are the current senators from missouri?
+            
+            1. United States senator is member of the United States Senate
+            2. Missouri is state of the United States of America
+            
+            Question: who was the president after jfk died?
+            
+            1. John F. Kennedy is President of the United States from 1961 to 1963
+            2.  President of the United States is head of state and head of government of the United States of America
+            
+            Question: what year did tut became king?
+            
+            1. Tutankhamon is 14th century BCE (18th dynasty) Egyptian pharaoh
+            2. pharaoh is ruler of Ancient Egypt
+            
+            Question: who is the president of the european union 2011?
+            
+            1. President of the European Parliament is head of debate oversight in the European Union legislature
+            
+            Question: what are eu countries?
+            
+            1. European Union is political and economic union of 27 European states
+            
+            Question: what country is located in the balkan peninsula?
+            
+            1. Balkans is geopolitical and cultural region of Southeast Europe
+            
+            Question: what money do japanese use?
+            
+            1. Japan is island country in East Asia
+            
+            Question: what movies does taylor lautner play in?
+            
+            1. Taylor Lautner is American actor
+            2. Film is sequence of images that give the impression of movement, stored on film stock
+            
+            Question: what is australian currency?
+            
+            1. Australia is country in Oceania
+            
+            Question: which asian country has the biggest population?
+            
+            1. country is distinct territorial body or political entity
+            2. Asia is continent
+            
+            Question: what book did charles darwin write on evolution?
+            
+            1. Charles Darwin is English naturalist and biologist (1809–1882)
+            2. evolution is change in heritable characteristics of biological populations over successive generations
+            3. written work is any work expressed in writing, such as inscriptions, manuscripts, documents or maps
+            
+            Question: when did the chicago bulls win their first championship?
+            
+            1. chicago bulls is American professional basketball team
+            2. NBA Finals is championship series of the National Basketball Association, annual from 1950; officially 
+            includes 1947 to 1949 BAA Finals; officially called the National Basketball Association World Championship 
+            Series through 1987
+            
+            Question: where is the best place to vacation in the dominican republic?
+            
+            1. Dominican Republic is island sovereign state in the Caribbean Sea
+            2. tourist attraction is place of interest where tourists visit
+            """},
             {"role": "user",
              "content": f"List the entities and their descriptions for this question:\n Question: {question}\n Answer:"}
         ]
@@ -242,16 +325,17 @@ def create_messages(prompt_type: str, domain: str, question: str) -> list:
 
 model_name = 'wikipedia_model'
 entity_set = 'wikidata'
-#dataset_type = 'compmix'
-#dataset_name = 'compmix_dev_set'
-dataset_type = 'wikiwebquestions'
-dataset_name = 'wikiwebquestions_train_set_processed'
+dataset_type = 'compmix'
+dataset_name = 'compmix_dev_set'
+#dataset_type = 'wikiwebquestions'
+#dataset_name = 'wikiwebquestions_train_set_processed'
 target_domains = ['all']
 #target_domains = ['all', 'tvseries']
 prompt_type = 'gpt_domain_not_passed_generic_examples_from_WWQ_compmix'
 #prompt_type = 'gpt_domain_not_passed_generic_examples_from_compmix'
-margin = 2  # additional number of entities compared to Refined original number that GPT can generate
-save = True
+size_of_predicted_entities_from_refined = True
+margin = 4  # additional number of entities compared to Refined original number that GPT can generate
+save = False
 azure = True
 seed = 12345
 temperature = 0.0
@@ -280,11 +364,22 @@ else: #openai
 input_file = f'{os.environ.get("DATASET_FOLDER")}{dataset_name}.json'
 data = json.load(open(input_file))
 
-result_file = \
-    f'{os.environ.get("OUTPUT_FOLDER")}result_{model_name}_{entity_set}_{dataset_name}_{prompt_type}_margin_{margin}.csv'
+if size_of_predicted_entities_from_refined:
+    result_file = \
+        (f'{os.environ.get("OUTPUT_FOLDER")}result_{model_name}_{entity_set}_{dataset_name}_{prompt_type}'
+         f'_margin_{margin}_extended_prompt.csv')
 
-llm_file = \
-    f'{os.environ.get("OUTPUT_FOLDER")}llm_training_{model_name}_{entity_set}_{dataset_name}_{prompt_type}_margin_{margin}.json'
+    llm_file = \
+        (f'{os.environ.get("OUTPUT_FOLDER")}llm_training_{model_name}_{entity_set}_{dataset_name}_{prompt_type}'
+         f'_margin_{margin}_extended_prompt.json')
+else:
+    result_file = \
+        (f'{os.environ.get("OUTPUT_FOLDER")}result_{model_name}_{entity_set}_{dataset_name}_{prompt_type}'
+         f'_max_entities_{margin}_extended_prompt.csv')
+
+    llm_file = \
+        (f'{os.environ.get("OUTPUT_FOLDER")}llm_training_{model_name}_{entity_set}_{dataset_name}_{prompt_type}'
+         f'_max_entities_{margin}_extended_prompt.json')
 
 domains = []
 num_exact_matches = []
@@ -339,7 +434,11 @@ for item in tqdm(data):
     num_predicted_entities.append(0)
     predicted_entity_ids = []
     predicted_entity_labels = []
-    for gpt_description in gpt_descriptions[:min(len(gpt_descriptions), (len(original_spans) + margin))]:
+    if size_of_predicted_entities_from_refined:
+        gpt_descriptions = gpt_descriptions[:min(len(gpt_descriptions), (len(original_spans) + margin))]
+    else:
+        gpt_descriptions = gpt_descriptions[:min(len(gpt_descriptions), margin)]
+    for gpt_description in gpt_descriptions:
         gpt_spans = refined.process_text(gpt_description)
         predicted_an_entity = False
         for gpt_span in gpt_spans:
@@ -387,6 +486,12 @@ for item in tqdm(data):
         outup_dic["sparql"] = sparql_query
         outup_dic["id"] = question_id
         output_dics.append(outup_dic)
+
+    if num_exact_matches[-1]!=num_gold_entities[-1]:
+        print(bcolors.WARNING + '|'.join(f'{q}: {l}' for q, l in zip(predicted_entity_ids, predicted_entity_labels))
+              + bcolors.ENDC)
+        print(bcolors.OKBLUE + '|'.join(f'{q}: {l}' for q, l in zip(gold_entity_ids, gold_entity_labels))
+              + bcolors.ENDC)
 
 if save:
     if save:

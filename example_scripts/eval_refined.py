@@ -54,7 +54,7 @@ other_flavors = 'no_domain_added_to_questions'
 save = True
 
 print(f'Evaluating model {model_name} with entity set {entity_set} and dataset '
-      f'{dataset_name} and {"and".join(target_domains)} domain(s) and with {other_flavors}:')
+      f'{dataset_name} and {" and ".join(target_domains)} domain(s) and with {other_flavors}:')
 
 refined = Refined.from_pretrained(model_name=model_name, entity_set=entity_set)
 
@@ -73,6 +73,8 @@ num_no_span = 0
 num_no_entity_in_span = 0
 num_questions = 0
 output = []
+#accuracy_data = dict()
+
 for item in tqdm(data):
     num_questions += 1
     if dataset_type == 'compmix':
@@ -137,7 +139,19 @@ for item in tqdm(data):
             output.append(row)
 
     num_gold_entities.append(len(gold_entity_ids))
-    num_predicted_entities.append(len(predicted_entity_ids))
+
+    #print(f'{question_id}: {question}')
+    #print(f'    Number of gold entities: {len(gold_entity_ids)}')
+    #print(f'    Number of predicted entities: {len(predicted_entity_ids)}')
+    #print(f'    Number of exact matches: {num_exact_matches[-1]}')
+    #if len(gold_entity_ids) not in accuracy_data:
+    #    accuracy_data[len(gold_entity_ids)] = dict()
+    #    accuracy_data[len(gold_entity_ids)]['num of gold entities'] = 0
+    #    accuracy_data[len(gold_entity_ids)]['num of predicted entities'] = 0
+    #    accuracy_data[len(gold_entity_ids)]['num of exact matches'] = 0
+    #accuracy_data[len(gold_entity_ids)]['num of gold entities'] += len(gold_entity_ids)
+    #accuracy_data[len(gold_entity_ids)]['num of predicted entities'] += len(predicted_entity_ids)
+    #accuracy_data[len(gold_entity_ids)]['num of exact matches'] += num_exact_matches[-1]
 
 if save:
     with open(output_file, 'w') as f:
@@ -147,6 +161,12 @@ if save:
                             'predicted_entity_id', 'predicted_entity_label', 'predicted_entity_score'])
         for row in output:
             csvwriter.writerow(row)
+
+#for k in accuracy_data:
+#    print(f'When number of gold entities per question is {k}:')
+#    print(f"    Total number of gold entities is: {accuracy_data[k]['num of gold entities']}")
+#    print(f"    Total number of predicted entities is: {accuracy_data[k]['num of predicted entities']}")
+#    print(f"    Total number of exact matches is: {accuracy_data[k]['num of exact matches']}")
 
 print(f'Number of questions with no span: {num_no_span}')
 print(f'Number of spans with no entity: {num_no_entity_in_span}')
