@@ -1,0 +1,83 @@
+(base) farhadghassemi@Farhads-MacBook-Pro ReFinED-main % together files upload ../../Datasets/llm_wikiwebquestions_train_set_margin_0.jsonl
+Uploading ../../Datasets/llm_wikiwebquestions_train_set_margin_0.jsonl: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 794k/794k [00:01<00:00, 563kB/s]
+{
+    "filename": "llm_wikiwebquestions_train_set_margin_0.jsonl",
+    "id": "file-0e409aeb-6d61-41d0-9ae1-851b0b8deb5a",
+    "object": "file",
+    "report_dict": {
+        "is_check_passed": true,
+        "model_special_tokens": "we are not yet checking end of sentence tokens for this model",
+        "file_present": "File found",
+        "file_size": "File size 0.001 GB",
+        "num_samples": 2431
+    }
+}
+
+(base) farhadghassemi@Farhads-MacBook-Pro ReFinED-main % together finetune create --training-file file-653f89c4-d674-454b-8d3d-0390f49a908f --model togethercomputer/llama-2-7b  --suffix _margin_0_epoch_4 --n-epochs 4
+Job creation details:
+{   'batch_size': 32,
+    'learning_rate': 1e-05,
+    'model': 'togethercomputer/llama-2-7b',
+    'n_checkpoints': 1,
+    'n_epochs': 4,
+    'suffix': '_margin_0_epoch_4',
+    'training_file': 'file-653f89c4-d674-454b-8d3d-0390f49a908f',
+    'wandb_key': None}
+
+Do you want to submit the job? [y/N]y
+{
+    "training_file": "file-653f89c4-d674-454b-8d3d-0390f49a908f",
+    "validation_file": "",
+    "model_output_name": "msorichi@stanford.edu/llama-2-7b-_margin_0_epoch_4-2023-12-07-08-14-18",
+    "model_output_path": "s3://together-dev/finetune/6550816ed4ecd55631152704/msorichi@stanford.edu/llama-2-7b-_margin_0_epoch_4-2023-12-07-08-14-18/ft-73ceb57f-b566-4e58-8978-129512060b4c",
+    "Suffix": "_margin_0_epoch_4",
+    "model": "togethercomputer/llama-2-7b",
+    "n_epochs": 4,
+    "n_checkpoints": 1,
+    "batch_size": 32,
+    "learning_rate": 1e-05,
+    "user_id": "6550816ed4ecd55631152704",
+    "lora": false,
+    "lora_r": 8,
+    "lora_alpha": 8,
+    "lora_dropout": 0,
+    "staring_epoch": 0,
+    "training_offset": 0,
+    "checkspoint_path": "",
+    "random_seed": "",
+    "created_at": "2023-12-07T08:14:18.204Z",
+    "updated_at": "2023-12-07T08:14:18.204Z",
+    "status": "pending",
+    "owner_address": "0x476f9ebefece69f00c51e2e1a1b2c5438c7171f3",
+    "id": "ft-73ceb57f-b566-4e58-8978-129512060b4c",
+    "job_id": "",
+    "token_count": 0,
+    "param_count": 0,
+    "total_price": 0,
+    "epochs_completed": 0,
+    "events": [
+        {
+            "object": "fine-tune-event",
+            "created_at": "2023-12-07T08:14:18.204Z",
+            "level": "",
+            "message": "Fine tune request created",
+            "type": "JOB_PENDING",
+            "param_count": 0,
+            "token_count": 0,
+            "wandb_url": "",
+            "checkpoint_path": "",
+            "model_path": "",
+            "training_offset": 0,
+            "hash": ""
+        }
+    ],
+    "queue_depth": 0,
+    "wandb_key": "",
+    "wandb_project_name": "",
+    "wandb_url": "",
+    "enable_checkpoints": false,
+    "internal_flags": ""
+}
+
+
+together finetune create --training-file file-b692c92c-b915-463f-aa74-02d3083e8130 --model togethercomputer/llama-2-7b  --suffix _margin_0_epoch_4 --n-epochs 4

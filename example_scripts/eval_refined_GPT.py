@@ -333,7 +333,7 @@ target_domains = ['all']
 #target_domains = ['all', 'tvseries']
 prompt_type = 'gpt_domain_not_passed_generic_examples_from_WWQ_compmix'
 #prompt_type = 'gpt_domain_not_passed_generic_examples_from_compmix'
-size_of_predicted_entities_from_refined = True
+size_of_predicted_entities_from_refined = False
 margin = 4  # additional number of entities compared to Refined original number that GPT can generate
 save = False
 azure = True
@@ -394,7 +394,11 @@ num_questions = 0
 for item in tqdm(data):
     num_questions += 1
     question = item['question']
-    #print(f'{num_questions}: {question}')
+    question_id = item['question_id']
+    if question_id != '5108':
+        continue
+    else:
+        print(f'{num_questions}: {question}')
     if dataset_type == 'compmix':
         domain = item['domain']
         gold_entities = item['entities']
@@ -458,8 +462,9 @@ for item in tqdm(data):
                     predicted_entity_score = None
                 if predicted_entity_id in gold_entity_ids:
                     num_exact_matches[-1] += 1
+                    gold_entity_id_idx = gold_entity_ids.index(predicted_entity_id)
                     row = [question_id, domain, question,
-                           predicted_entity_id, predicted_entity_label,
+                           predicted_entity_id, gold_entities[gold_entity_id_idx]['label'],
                            predicted_entity_id, predicted_entity_label, predicted_entity_score]
                     output_result.append(row)
                 else:
