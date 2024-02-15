@@ -44,10 +44,10 @@ def compute_metrics(num_exact_matches: list, num_predicted_entities: list,
 
 model_name = 'wikipedia_model'
 entity_set = 'wikidata'
-dataset_type = 'wikiwebquestions'
-dataset_name = 'wikiwebquestions_train_set_processed'
-#dataset_type = 'compmix'
-#dataset_name = 'compmix_dev_set'
+#dataset_type = 'wikiwebquestions'
+#dataset_name = 'wikiwebquestions_train_set_processed'
+dataset_type = 'compmix'
+dataset_name = 'compmix_dev_set'
 target_domains = ['all']
 #target_domains = ['all', 'tvseries']
 other_flavors = 'no_domain_added_to_questions'
